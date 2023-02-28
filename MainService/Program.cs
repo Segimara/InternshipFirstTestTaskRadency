@@ -19,7 +19,7 @@ namespace MainService
             IFileHandlerFactory<PaymentTransaction> factory = new PaymentTransactionsFileHandlerFactory();
             IDailyLogHandler<DailyLog> dailyLogHandle = new DailyLogHandler();
             IFilePool filePool = new FileParallelPoolService(NumberOfProcessor);
-            IFileProcessor<PaymentTransaction> fileProcessor = new PaymentTransactionsFileProcessorService(DailyLogMemory.Instance,factory, dailyLogHandle, filePool).AddConfiguration(config.GetSection("FileHandler"));
+            IFileProcessor<PaymentTransaction> fileProcessor = new PaymentTransactionsFileProcessorService(factory, dailyLogHandle).AddConfiguration(config.GetSection("FileHandler"));
             fileProcessor.Run();
         }
         

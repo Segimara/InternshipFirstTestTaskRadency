@@ -2,19 +2,21 @@
 using MainService.Model;
 using MainService.Model.PaymantTransaction;
 using MainService.Services;
-using System.IO;
+using Newtonsoft.Json;
 using System.Text.Json;
+using JsonSerializer = Newtonsoft.Json.JsonSerializer;
+
 namespace MainService.Handlers
 {
 
-    public class CSVFileHandlerService 
+    public class CSVFileHandlerService : IFileHandler<PaymentTransaction>
     {
         public IParser<PaymentTransaction> Parser { get; set; }
         public CSVFileHandlerService(IParser<PaymentTransaction> parser)
         {
             Parser = parser;
         }
-        public FileHandleResponse Handle(string filePath, string destributionPath)
+        public FileHandleResponse Handle(string filePath, string destributionPath, string fileName)
         {
             FileHandleResponse response = new FileHandleResponse();
             response.FileName = Path.GetFileName(filePath);
@@ -31,12 +33,16 @@ namespace MainService.Handlers
                 return parsedLine;
             });
             var transformed = serialized.Where(n => n != null).paymentToCityTransactions();
-            using (var writer = new StreamWriter(File.Open(filePath, FileMode.Create)))
+            var directoryNAme = destributionPath.Replace(fileName, "");
+            if (!Directory.Exists(directoryNAme))
+                Directory.CreateDirectory(directoryNAme);
+            using (var stream = new StreamWriter(File.Open(destributionPath, FileMode.Create)))
             {
-                JsonSerializer.Serialize(writer.BaseStream, transformed);
+                stream.Write(JsonConvert.SerializeObject(transformed));
 
             }
-            File.Delete(filePath);
+            FileInfo fileInfo = new FileInfo(filePath);
+            fileInfo.Delete();
             return response;
         }
     }

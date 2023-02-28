@@ -10,6 +10,7 @@ namespace MainService
         private int ParsedFiles;
         private ConcurrentBag<string> _invalidFiles;
         private readonly object _lock = new object();
+        public static DailyLogMemory Instance { get; } = new DailyLogMemory();
         public DailyLogMemory()
         {
             ParsedFiles = 0;
@@ -119,7 +120,6 @@ namespace MainService
                 _invalidFiles = new ConcurrentBag<string>();
             }
         }
-
-        public static DailyLogMemory Instance { get; } = new DailyLogMemory();
+        
     }
 }

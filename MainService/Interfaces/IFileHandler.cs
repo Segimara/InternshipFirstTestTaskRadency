@@ -11,7 +11,7 @@ namespace MainService.Interfaces
     {
         //can be some factory 
         IParser<TResponse> Parser { get; set; }
-        public FileHandleResponse Handle(string filePath, string destributionPath);
+        public FileHandleResponse Handle(string filePath, string destributionPath, string fileName);
     }
     
 }

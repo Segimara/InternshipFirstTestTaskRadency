@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace MainService.Services
 {
     //need to implement Dispose pattern
-    public class FileParallelPoolService : IFilePool
+    public class FileParallelPoolService : IFilePool, IDisposable
     {
         private readonly int _batchSize = 4;    
         public bool isStarted { get; set; } = false;
@@ -24,8 +24,6 @@ namespace MainService.Services
         }
         private void ProcessFileBatch(CancellationToken cancellationToken)
         {
-            
-
             while (fileQueue.TryDequeue(out Action process) && !cancellationToken.IsCancellationRequested)
             {
                 var task = Task.Run(() =>
@@ -74,5 +72,13 @@ namespace MainService.Services
             while (fileQueue.TryDequeue(out Action _)) { }
         }
 
+    public void Dispose()
+    {
+        processingCancellationTokenSource.Cancel();
+            
+        Task.WaitAll(tasks.ToArray());
+            
+        processingCancellationTokenSource.Dispose();
+    }
     }
 }

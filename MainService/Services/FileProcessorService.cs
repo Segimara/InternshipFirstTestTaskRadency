@@ -10,38 +10,69 @@ using System.Linq;
 namespace MainService.Services
 {
     //decompose to IFileProcessor, IFileCheker
-    public class PaymentTransactionsFileProcessorService : IFileProcessor<PaymentTransaction>
+    public class PaymentTransactionsFileProcessorService : IFileProcessor<PaymentTransaction>, IDisposable
     {
         private int maxThreads;
         bool isWorking = false;
-        private DailyLogMemory DailyLogMemoryStore; //todo extract interface
+        //private DailyLogMemory DailyLogMemory.Insrance; //todo extract interface
         private FileProcessorConfig fileHandlerConfig;
-        IFilePool _poolService;
+        //IFilePool _poolService;
         FileSystemWatcher watcher;
         System.Timers.Timer timer;
         IFileHandlerFactory<PaymentTransaction> _factory;
         private IFileHandler<PaymentTransaction> _fileHandler;
         private IDailyLogHandler<DailyLog> _dailyLogHandle;
-        private object _lock = new object();
-
-        public IFilePool TaskPool { get => _poolService; }
+        private bool disposed = false;
+        //public IFilePool TaskPool { get => _poolService; }
 
         public PaymentTransactionsFileProcessorService()
         {
             watcher = new FileSystemWatcher();
         }
         //add injection of IParserFactory 
-        public PaymentTransactionsFileProcessorService(DailyLogMemory DailyLogMemoryStore,
+        public PaymentTransactionsFileProcessorService(/*DailyLogMemory DailyLogMemory.Insrance,*/
             IFileHandlerFactory<PaymentTransaction> factory,
-            IDailyLogHandler<DailyLog> dailyLogHandle,
-            IFilePool filePool) : this()
+            IDailyLogHandler<DailyLog> dailyLogHandle) : this()
         {
-            this.DailyLogMemoryStore = DailyLogMemoryStore;
+            //this.DailyLogMemory.Insrance = DailyLogMemory.Insrance;
             this.fileHandlerConfig = fileHandlerConfig;
             _factory = factory;
             _dailyLogHandle = dailyLogHandle;
-            _poolService = filePool;
+            //_poolService = filePool;
         }
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            if (disposing)
+            {
+                watcher.EnableRaisingEvents = false;
+                watcher.Created -= OnFileCreated;
+                watcher.Dispose();
+
+                timer.Stop();
+                timer.Elapsed -= OnTimedEvent;
+                timer.Dispose();
+                
+            }
+
+            disposed = true;
+        }
+
+
+        ~PaymentTransactionsFileProcessorService()
+        {
+            Dispose(false);
+        }
+
         public void Run()
         {
             string command = "start";
@@ -87,11 +118,11 @@ namespace MainService.Services
         {
             Stop();
         }
-        public PaymentTransactionsFileProcessorService SetupDailyStore(DailyLogMemory DailyLogMemoryStore)
-        {
-            this.DailyLogMemoryStore = DailyLogMemoryStore;
-            return this;
-        }
+        //public PaymentTransactionsFileProcessorService SetupDailyStore(DailyLogMemory DailyLogMemory.Insrance)
+        //{
+        //    this.DailyLogMemory.Insrance = DailyLogMemory.Insrance;
+        //    return this;
+        //}
         public PaymentTransactionsFileProcessorService SetupConfiguration(FileProcessorConfig config)
         {
             this.fileHandlerConfig = config;
@@ -123,9 +154,8 @@ namespace MainService.Services
             isWorking = true;
             CheckConfig();
             InitFolders(fileHandlerConfig);
-            _poolService.StartQueue();
             StartFileSystemWatcher();
-            SetupTimer(fileHandlerConfig, DailyLogMemoryStore);
+            SetupTimer();
             Console.WriteLine("Application was started");
             AddExistingFiles();
         }
@@ -133,7 +163,6 @@ namespace MainService.Services
         {
 
             Console.WriteLine("Start pausing an application");
-            _poolService.PauseProcessing();
             watcher.EnableRaisingEvents = false;
             watcher.Dispose();
             timer.Stop();
@@ -167,26 +196,24 @@ namespace MainService.Services
             }
             foreach (var file in files)
             {
-                _poolService.AddAction(() => HandleFile(file));
+                HandleFile(file);
             }
         }
 
         void HandleFile(string filePath)
         {
-            lock (_lock)
+            var file = new FileInfo(filePath);
+            if (_factory.Parsers.Keys.Any(x => x == "." + Path.GetExtension(filePath)))
             {
-                var file = new FileInfo(filePath);
-                if (_factory.Parsers.Keys.Any(x => x == "." + Path.GetExtension(filePath)))
-                {
-                    return;
-                }
-                var handler = _factory[file.Extension];
-                //string subFolderPath = @"\" + DateTime.Now.ToString("MM-dd-yyyy");
-                string subFolderPath = DateTime.Now.ToString("hh_mm");
-                string subfolderCPath = Path.Combine(fileHandlerConfig.FolderB, subFolderPath);
-                string fileDest = Path.Combine(subfolderCPath, "output" + UniqueFileNumber.Instance.GetUniqueNumber() + ".json");
-                DailyLogMemoryStore.AddFileResponse(handler.Handle(filePath, fileDest));
+                return;
             }
+            var handler = _factory[file.Extension];
+            string subFolderPath = @"\" + DateTime.Now.ToString("MM-dd-yyyy");
+            //string subFolderPath = DateTime.Now.ToString("hh");
+            string subfolderCPath = Path.Combine(fileHandlerConfig.FolderB, subFolderPath);
+            var filename = "output" + UniqueFileNumber.Instance.GetUniqueNumber() + ".json";
+            string fileDest = Path.Combine(subfolderCPath, filename);
+            DailyLogMemory.Instance.AddFileResponse(handler.Handle(filePath, fileDest, filename));
         }
         void StartFileSystemWatcher()
         {
@@ -196,32 +223,68 @@ namespace MainService.Services
             watcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName;
             watcher.IncludeSubdirectories = false;
 
-            // Add event handlers.
-            watcher.Created += async (sender, e) =>
-            {
-                _poolService.AddAction(() => HandleFile(e.FullPath));
-            };
-            //watcher.Error += OnWatcherError;
+            watcher.Created += OnFileCreated;
+            watcher.Error += OnWatcherError;
 
-            // Start monitoring.
             watcher.IncludeSubdirectories = false;
             watcher.EnableRaisingEvents = true;
         }
-        void SetupTimer(FileProcessorConfig cfg, DailyLogMemory DailyLogMemoryStore)
+
+        private async void OnFileCreated(object sender, FileSystemEventArgs e)
+        {
+            try
+            {
+                HandleFile(e.FullPath);
+            }
+            catch(Exception ee)
+            {
+                Console.WriteLine(ee.Message);
+            }
+        }
+
+        private void OnWatcherError(object sender, ErrorEventArgs e)
+        {
+            Console.WriteLine(e.GetException().Message);
+        }
+        
+        void SetupTimer()
         {
             DateTime now = DateTime.Now;
-            //DateTime midnight = DateTime.Today.AddDays(1).AddTicks(-1);
-            //TimeSpan timeUntilMidnight = midnight - now;
-            //test 
-            TimeSpan timeUntilMidnight = new TimeSpan(0, 0, 20);
+            DateTime midnight = DateTime.Today.AddDays(1).AddTicks(-1);
+            TimeSpan timeUntilMidnight = midnight - now;
+            
+            var fileName = Path.Combine(fileHandlerConfig.FolderB, midnight.ToString("dd_MM_yyyy"), "meta.log");
 
             timer = new System.Timers.Timer(timeUntilMidnight.TotalMilliseconds);
             timer.AutoReset = false;
-            timer.Elapsed += new ElapsedEventHandler((sender, e) =>
-            {
-                OnTimerElapsed(cfg, DailyLogMemoryStore);
-            });
+            timer.Elapsed += OnTimedEvent;
             timer.Enabled = true;
+        }
+        private void OnTimedEvent(object? sender, ElapsedEventArgs e)
+        {
+            OnTimerElapsed();
+        }
+        private void OnTimerElapsed()
+        {
+            if (DailyLogMemory.Instance.GetParsedLines() == 0 && DailyLogMemory.Instance.GetParsedFiles() == 0 && DailyLogMemory.Instance.GetInvalidLines() == 0)
+            {
+                SetupTimer();
+                return;
+            }
+
+            var fileName = Path.Combine(fileHandlerConfig.FolderB, DateTime.Now.ToString("dd_MM_yyyy"), "meta.log");
+            _dailyLogHandle.Handle(DailyLogMemory.Instance.GetDailyLog(), fileName);
+            if (!Directory.Exists(fileName))
+            {
+                Directory.CreateDirectory(fileName);
+            }
+            string DailyLogPath = Path.Combine(fileName, "meta.log");
+            var dailyLog = DailyLogMemory.Instance.GetDailyLog();
+            _dailyLogHandle.Handle(dailyLog, DailyLogPath);
+            
+            DailyLogMemory.Instance.Reset();
+
+            SetupTimer();
         }
         void CheckConfig()
         {
@@ -231,33 +294,6 @@ namespace MainService.Services
                 Console.WriteLine("PaymentTransactionsFileProcessorService does not have configuration");
                 Console.ForegroundColor = ConsoleColor.Gray;
             }
-        }
-        private void OnTimerElapsed(FileProcessorConfig cfg, DailyLogMemory DailyLogMemoryStore)
-        {
-            if (DailyLogMemoryStore.GetParsedLines() == 0 && DailyLogMemoryStore.GetParsedFiles() == 0 && DailyLogMemoryStore.GetInvalidLines() == 0)
-            {
-                SetupTimer(cfg, DailyLogMemoryStore);
-                return;
-            }
-            //string subFolderPath = @"\" + DateTime.Now.ToString("MM-dd-yyyy");
-            string subFolderPath = DateTime.Now.ToString("hh_mm");
-            string subfolderCPath = Path.Combine(cfg.FolderB, subFolderPath);
-
-            // Create the subfolder C if it doesn't exist
-            if (!Directory.Exists(subfolderCPath))
-            {
-                Directory.CreateDirectory(subfolderCPath);
-            }
-            string DailyLogPath = Path.Combine(subfolderCPath, "meta.log");
-            // Get the parsed files count and parsed lines count from the dictionary
-            var dailyLog = DailyLogMemoryStore.GetDailyLog();
-            _dailyLogHandle.Handle(dailyLog, DailyLogPath);
-
-            // Reset the dictionaries for the next day
-            DailyLogMemoryStore.Reset();
-
-            // Setup the timer for the next day
-            SetupTimer(cfg, DailyLogMemoryStore);
         }
         public IFileProcessor<PaymentTransaction> AddConfiguration(IConfigurationSection configuration)
         {

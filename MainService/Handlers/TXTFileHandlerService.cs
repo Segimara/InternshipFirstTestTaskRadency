@@ -2,6 +2,7 @@
 using MainService.Model;
 using MainService.Model.PaymantTransaction;
 using MainService.Services;
+using Newtonsoft.Json;
 using System.Text.Json;
 namespace MainService.Handlers
 {
@@ -13,7 +14,7 @@ namespace MainService.Handlers
         {
             Parser = parser;
         }
-        public FileHandleResponse Handle(string filePath, string destributionPath)
+        public FileHandleResponse Handle(string filePath, string destributionPath,  string fileName)
         {
             FileHandleResponse response = new FileHandleResponse();
             response.FileName = Path.GetFileName(filePath);
@@ -31,16 +32,18 @@ namespace MainService.Handlers
                 return parsedLine;
             });
             var transformed = serialized.Where(n => n != null).paymentToCityTransactions();
-            
-            using (var writer = new StreamWriter(File.Open(filePath, FileMode.Create)))
-            {
-                foreach (var obj in transformed)
-                {
-                    JsonSerializer.SerializeAsync(writer.BaseStream, obj);
-                    writer.Flush();
-                }
-            }
 
+            var directoryNAme = destributionPath.Replace(fileName, "");
+            
+            if (!Directory.Exists(directoryNAme))
+                Directory.CreateDirectory(directoryNAme);
+            using (var stream = new StreamWriter(File.Open(destributionPath, FileMode.Create)))
+            {
+                stream.Write(JsonConvert.SerializeObject(transformed));
+                
+            }
+            FileInfo fileInfo = new FileInfo(filePath);
+            fileInfo.Delete();
             return response;
         }
     }

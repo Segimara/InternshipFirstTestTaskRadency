@@ -12,11 +12,22 @@ namespace MainService.Services
 {
     public class PaymentTransactionsFileHandlerFactory : IFileHandlerFactory<PaymentTransaction>
     {
+        public IFileHandler<PaymentTransaction> this[string key]
+        {
+            get
+            {
+                return Parsers[key];
+            }
+        }
+
         public static IParser<PaymentTransaction> Parser { get; set; } = new PaymentTransactionParser();
-        
-        public static IDictionary<string, Type> Parsers { get; private set; } = new Dictionary<string, Type>{
-            { ".csv", CSVFileHandlerService.Handle()},
-            { ".txt", TXTFileHandlerService},
+
+
+
+        public IDictionary<string, IFileHandler<PaymentTransaction>> Parsers { get; private set; } = new Dictionary<string, IFileHandler<PaymentTransaction>>{
+            { ".csv", new CSVFileHandlerService(Parser) },
+            { ".txt", new TXTFileHandlerService(Parser) },
         };
+        
     }
 }

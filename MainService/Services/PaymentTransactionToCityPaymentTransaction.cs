@@ -13,7 +13,7 @@ namespace MainService.Services
         public static IEnumerable<CityTransaction> paymentToCityTransactions(this IEnumerable<PaymentTransaction> transactions)
         {
             return transactions
-                    .GroupBy(t => t.Address.Split(',')[1].Trim()) // group by city (assuming address is in format "street, city")
+                    .GroupBy(t => t.Address.Split(',')[0].Trim()) // group by city (assuming address is in format "street, city")
                     .Select(g => new CityTransaction {
                         City = g.Key,
                         Services = g.GroupBy(t => t.Service) // group by service

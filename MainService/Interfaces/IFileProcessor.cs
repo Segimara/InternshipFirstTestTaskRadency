@@ -9,7 +9,7 @@ namespace MainService.Interfaces
 {
     public interface IFileProcessor<T>
     {
-        IFilePool TaskPool { get;}
+        //IFilePool TaskPool { get;}
         void Start();
         void Stop();
         void Reset();
