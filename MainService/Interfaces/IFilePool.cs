@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace MainService.Interfaces
 {
-    public interface IStringNormalizer
+    public interface IFilePool
     {
 
     }

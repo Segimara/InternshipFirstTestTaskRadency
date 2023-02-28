@@ -8,6 +8,7 @@ namespace MainService.Interfaces
 {
     public interface IParserFactory
     {
-
+        IDictionary<string, Type> Parsers { get; }
+        Type this[string key] { get; }
     }
 }
