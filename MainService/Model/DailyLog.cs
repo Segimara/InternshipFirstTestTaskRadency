@@ -6,15 +6,11 @@ using System.Threading.Tasks;
 
 namespace MainService.Model
 {
-    public class FileHandleResponse
+    public class DailyLog
     {
-        public bool isInvalid { get; set; }
+        public int ParsedFiles { get; set; }
         public int ParsedLines { get; set; }
         public int InvalidLines { get; set; }
-        public string FileName { get; set; }
-        public FileHandleResponse()
-        {
-
-        }
+        public IList<string> InvalidFileNames { get; set; }
     }
 }

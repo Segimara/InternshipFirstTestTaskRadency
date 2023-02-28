@@ -7,13 +7,13 @@ using System.Threading.Tasks;
 
 namespace MainService.Interfaces
 {
-    public interface IFileProcessor
+    public interface IFileProcessor<T>
     {
-        IFilePool FilePool { get; set; }
+        IFilePool TaskPool { get;}
         void Start();
         void Stop();
         void Reset();
         void Run();
-        IFileProcessor AddConfiguration(IConfiguration configuration);
+        IFileProcessor<T> AddConfiguration(IConfigurationSection configuration);
     }
 }

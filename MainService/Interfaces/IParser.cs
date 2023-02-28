@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 
 namespace MainService.Interfaces
 {
-    public interface IParser
+    public interface IParser<T>
     {
-
+        public T Parse(string line);
     }
 }

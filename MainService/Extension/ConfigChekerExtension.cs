@@ -5,12 +5,12 @@ namespace MainService.Extension
 {
     public static class ConfigChekerExtension
     {
-        public static T CheckHasValidConfig<T>(this IConfiguration config)
+        public static T CheckHasValidConfig<T>(this IConfigurationSection config)
         {
             try
             {
-                var json = JsonSerializer.Serialize(config);
-                var cfg = JsonSerializer.Deserialize<T>(json);
+
+                var cfg = config.Get<T>();
                 if (cfg == null)
                     throw new Exception("Empty Config");
                 return cfg;

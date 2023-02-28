@@ -4,10 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MainService.Parsers
+namespace MainService.Interfaces
 {
-    public class TxtParser
+    public interface IDailyLogHandler<T> 
     {
-
+        void Handle(T dailyLog, string fileName);
     }
 }

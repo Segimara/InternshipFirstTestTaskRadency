@@ -4,69 +4,75 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace MainService.Services
 {
-    //todo create dispose pattern and ask "would app process remaining {N} files?"
-    public class FileParalelPoolService : IFilePool
+    //need to implement Dispose pattern
+    public class FileParallelPoolService : IFilePool
     {
-        private readonly int _batchSize = 100;
-        private readonly DailyLogMemory _DailyLogMemoryStorege;
-        
+        private readonly int _batchSize = 4;    
+        public bool isStarted { get; set; } = false;
+        List<Task> tasks = new List<Task>();
+        private readonly ConcurrentQueue<Action> fileQueue = new ConcurrentQueue<Action>();
+        private readonly CancellationTokenSource processingCancellationTokenSource = new CancellationTokenSource();
 
-        
-        private readonly ConcurrentQueue<(string, string)> fileQueue = new ConcurrentQueue<(string, string)>();
-
-        public FileParalelPoolService(int NumberOfProcessor, DailyLogMemory DailyLogMemoryStorege)
+        public FileParallelPoolService(int NumberOfProcessor)
         {
             _batchSize = NumberOfProcessor;
-            _DailyLogMemoryStorege = DailyLogMemoryStorege;
         }
-        
-        private void ProcessFileBatch()
+        private void ProcessFileBatch(CancellationToken cancellationToken)
         {
-            var tasks = new List<Task>();
             
-            while (fileQueue.TryDequeue(out (string, string) Paths))
-            {
-                var task = Task.Run(async () =>
-                {
-                    //string subFolderPath = @"\" + DateTime.Now.ToString("MM-dd-yyyy");
-                    string subFolderPath = @"\" + DateTime.Now.ToString("hh_mm");
-                    var fileDestributionPath = Path.Combine(Paths.Item2 + subFolderPath, UniqueFileNumber.Instance.GetUniqueNumber() + ".txt");
-                    var fileResponse = await FileHandlerService.HandleAsync(Paths.Item1, fileDestributionPath);
-                    _DailyLogMemoryStorege.AddParsedLines(fileResponse.ParsedLines);
-                    if (fileResponse.isInvalid)
-                    {
-                        _DailyLogMemoryStorege.AddErrorsLines(fileResponse.InvalidLines);
-                        _DailyLogMemoryStorege.AddInvalidFiles(fileResponse.FileName);
-                    }
 
-                });
-                
+            while (fileQueue.TryDequeue(out Action process) && !cancellationToken.IsCancellationRequested)
+            {
+                var task = Task.Run(() =>
+                {
+                    process();
+                    GC.Collect();
+                }, cancellationToken);
+
                 tasks.Add(task);
-                
+
                 if (tasks.Count >= Environment.ProcessorCount)
                 {
-                    Task.WaitAll(tasks.ToArray());
-                    GC.Collect();
+                    Task.WaitAll(tasks.ToArray(), cancellationToken);
                 }
             }
+
+            Task.WaitAll(tasks.ToArray(), cancellationToken);
             
-            Task.WaitAll(tasks.ToArray());
-            GC.Collect();
         }
 
-        public void AddFile(string filePath, string processedFolderPath)
+        public void AddAction(Action action)
         {
-            fileQueue.Enqueue((filePath, processedFolderPath));
-            
-            if (fileQueue.Count <= _batchSize)
+            fileQueue.Enqueue(action);
+
+            if (fileQueue.Count <= _batchSize && isStarted)
             {
-                ProcessFileBatch();
+                ProcessFileBatch(processingCancellationTokenSource.Token);
             }
         }
-    }
+        public void StartQueue()
+        {
+            isStarted = true;
+            if (fileQueue.Count > 0)
+            {
+                
+                ProcessFileBatch(processingCancellationTokenSource.Token);
+            }
+        }
+        public void PauseProcessing()
+        {
+            Task.WaitAll(tasks.ToArray());
+            isStarted = false;
+        }
+        public void CleanQueue()
+        {
+            while (fileQueue.TryDequeue(out Action _)) { }
+        }
 
+    }
 }

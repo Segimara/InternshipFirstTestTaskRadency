@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace MainService.Interfaces
 {
-    public interface IParserFactory
+    public interface IFileHandlerFactory<T> 
     {
-        IDictionary<string, Type> Parsers { get; }
-        Type this[string key] { get; }
+        IDictionary<string, IFileHandler<T>> Parsers { get; }
+        IFileHandler<T> this[string key] { get; }
     }
 }
