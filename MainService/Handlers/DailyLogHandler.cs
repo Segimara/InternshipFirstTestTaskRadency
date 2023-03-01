@@ -16,7 +16,7 @@ namespace MainService.Handlers
             int parsedLinesCount = dailyLog.ParsedLines;
             int invalidFilesCount = dailyLog.InvalidLines;
             IList<string> invalidFilePaths = dailyLog.InvalidFileNames;
-            if (!invalidFilePaths.Any() || parsedLinesCount == 0)
+            if (invalidFilePaths.Any() || parsedLinesCount == 0)
             {
                 return;
             }

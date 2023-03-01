@@ -251,10 +251,9 @@ namespace MainService.Services
         {
             DateTime now = DateTime.Now;
             DateTime midnight = DateTime.Today.AddDays(1).AddTicks(-1);
-            TimeSpan timeUntilMidnight = midnight - now;
+            //TimeSpan timeUntilMidnight = midnight - now;
             
-            var fileName = Path.Combine(fileHandlerConfig.FolderB, midnight.ToString("dd_MM_yyyy"), "meta.log");
-
+            TimeSpan timeUntilMidnight = TimeSpan.FromMinutes(1);
             timer = new System.Timers.Timer(timeUntilMidnight.TotalMilliseconds);
             timer.AutoReset = false;
             timer.Elapsed += OnTimedEvent;
@@ -273,14 +272,9 @@ namespace MainService.Services
             }
 
             var fileName = Path.Combine(fileHandlerConfig.FolderB, DateTime.Now.ToString("dd_MM_yyyy"), "meta.log");
-            _dailyLogHandle.Handle(DailyLogMemory.Instance.GetDailyLog(), fileName);
-            if (!Directory.Exists(fileName))
-            {
-                Directory.CreateDirectory(fileName);
-            }
-            string DailyLogPath = Path.Combine(fileName, "meta.log");
+            
             var dailyLog = DailyLogMemory.Instance.GetDailyLog();
-            _dailyLogHandle.Handle(dailyLog, DailyLogPath);
+            _dailyLogHandle.Handle(dailyLog, fileName);
             
             DailyLogMemory.Instance.Reset();
 
