@@ -20,9 +20,10 @@ namespace MainService.Handlers
             {
                 return;
             }
-            if (Directory.Exists(fileName))
+            var directoryName = Path.GetDirectoryName(fileName);
+            if (!Directory.Exists(directoryName))
             {
-                Directory.CreateDirectory(fileName);
+                Directory.CreateDirectory(directoryName);
             }
             using (StreamWriter writer = File.CreateText(fileName))
             {
