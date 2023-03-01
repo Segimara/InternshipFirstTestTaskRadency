@@ -208,7 +208,7 @@ namespace MainService.Services
                 return;
             }
             var handler = _factory[file.Extension];
-            string subFolderPath = @"\" + DateTime.Now.ToString("MM-dd-yyyy");
+            string subFolderPath = DateTime.Now.ToString("dd_MM_yyyy");
             //string subFolderPath = DateTime.Now.ToString("hh");
             string subfolderCPath = Path.Combine(fileHandlerConfig.FolderB, subFolderPath);
             var filename = "output" + UniqueFileNumber.Instance.GetUniqueNumber() + ".json";
